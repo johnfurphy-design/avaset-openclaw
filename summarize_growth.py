@@ -10,6 +10,17 @@ import subprocess
 import json
 
 def analyze_logs():
+
+    workspace = os.path.expanduser("~/.openclaw/workspace")
+    os.chdir(workspace) # Force move into the repo folder
+    
+    if not os.path.isdir(".git"):
+        print("[!] Error: Still can't find .git in " + workspace)
+        return
+ 
+
+
+
     # Get the last 5 commit messages
     cmd = ["git", "log", "-5", "--pretty=format:%s"]
     commits = subprocess.check_output(cmd).decode("utf-8").split("\n")
