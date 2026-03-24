@@ -8,6 +8,7 @@
 
 import subprocess
 import json
+import os
 
 def analyze_logs():
 

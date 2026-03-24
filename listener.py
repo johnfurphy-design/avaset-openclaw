@@ -39,8 +39,8 @@ from email.message import EmailMessage
 from datetime import datetime
 
 # --- CONFIGURATION ---
-EMAIL_ADDRESS = "your-google-email@gmail.com"
-EMAIL_PASSWORD = "your-app-password" 
+EMAIL_ADDRESS = "John.Furphy@gmail.com"
+EMAIL_PASSWORD = "vsdlllvfxwnzvzwc" 
 IMAP_SERVER = "imap.gmail.com"
 SMTP_SERVER = "smtp.gmail.com"
 STATE_FILE = "equilibrium_state.json"
@@ -85,7 +85,12 @@ def process_inbox():
             print("[+] Listener: No new prompts in inbox.")
             return
 
-        for num in messages.split():
+        if isinstance(messages[0], bytes):
+            msg_list = messages[0].split()
+        else:
+            msg_list = messages
+
+        for num in msg_list:
             _, data = mail.fetch(num, "(RFC822)")
             for response_part in data:
                 if isinstance(response_part, tuple):

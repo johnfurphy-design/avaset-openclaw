@@ -9,7 +9,7 @@ import json
 def send_status_email(subject, body):
     # Configuration - Use your Google App Password here
     EMAIL_ADDRESS = "John.Furphy@gmail.com"
-    EMAIL_PASSWORD = "vsdl llvf xwnz vzwc" # Not your login password! see Email-app-PW.help
+    EMAIL_PASSWORD = "vsdlllvfxwnzvzwc" # Not your login password! see Email-app-PW.help
 
     msg = EmailMessage()
     msg.set_content(body)
