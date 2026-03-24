@@ -2,4 +2,4 @@ have avaset analyze her git history
 
 add speech output
 
-
+Should we add a "Login Autostart" so Avaset's environment and aliases load automatically every time you open your terminal?
