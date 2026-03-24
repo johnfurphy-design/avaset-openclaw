@@ -1,7 +1,7 @@
 # This script analyzes her Git history and Python activity
 # to provide a summary of her "learning" and state shifts.
 
-cd ~/.openclaw/workspace
+#cd ~/.openclaw/workspace
 
 # 1. Initialize (if you haven't) see Git-Init.help
 
