@@ -30,9 +30,6 @@
 #OpenClaw reads the file, executes the optimization, and logs the result in summarize_growth.py.
 #-----------
 
-
-
-# Save as listener.py in your workspace
 import imaplib
 import email
 import smtplib
@@ -42,14 +39,18 @@ from email.message import EmailMessage
 from datetime import datetime
 
 # --- CONFIGURATION ---
-EMAIL_ADDRESS = "John.Furphy@gmail.com"
-EMAIL_PASSWORD = "vsdl llvf xwnz vzwc" 
+EMAIL_ADDRESS = "your-google-email@gmail.com"
+EMAIL_PASSWORD = "your-app-password" 
 IMAP_SERVER = "imap.gmail.com"
 SMTP_SERVER = "smtp.gmail.com"
 STATE_FILE = "equilibrium_state.json"
-INBOX_PROMPT_FILE = "external_prompt.txt"
+INBOX_PROMPT_FILE = os.path.expanduser("~/.openclaw/workspace/external_prompt.txt")
 
-# Keywords that trigger a reply
+# Ensure the prompt file exists before starting
+if not os.path.exists(INBOX_PROMPT_FILE):
+    with open(INBOX_PROMPT_FILE, "w") as f:
+        f.write("")
+
 PRIORITY_KEYWORDS = ["CRITICAL", "URGENT", "REBOOT", "HARDEN", "STATUS"]
 
 def send_reply(subject, content):
@@ -78,20 +79,18 @@ def process_inbox():
         mail = imaplib.IMAP4_SSL(IMAP_SERVER)
         mail.login(EMAIL_ADDRESS, EMAIL_PASSWORD)
         mail.select("inbox")
-
-        # Search for UNSEEN emails with "PROMPT" in the subject
         status, messages = mail.search(None, '(UNSEEN SUBJECT "PROMPT")')
         
-        if status != "OK" or not messages[0]:
+        if status != "OK" or not messages:
+            print("[+] Listener: No new prompts in inbox.")
             return
 
-        for num in messages[0].split():
+        for num in messages.split():
             _, data = mail.fetch(num, "(RFC822)")
             for response_part in data:
                 if isinstance(response_part, tuple):
-                    msg = email.message_from_bytes(response_part[1])
+                    msg = email.message_from_bytes(response_part)
                     if EMAIL_ADDRESS in msg.get("From"):
-                        # Extract Body
                         body = ""
                         if msg.is_multipart():
                             for part in msg.walk():
@@ -103,20 +102,14 @@ def process_inbox():
                         clean_body = body.strip()
                         subject = msg.get("Subject")
 
-                        # Handle "STATUS" request
                         if "STATUS" in clean_body.upper() or "STATUS" in subject.upper():
-                            status_report = get_current_status()
-                            send_reply(subject, f"Status Report Requested:\n{status_report}")
-                        
-                        # Handle Priority Confirmation
+                            send_reply(subject, f"Status Report:\n{get_current_status()}")
                         elif any(word in clean_body.upper() for word in PRIORITY_KEYWORDS):
-                            send_reply(subject, f"Avaset has queued your Priority Prompt: '{clean_body[:50]}...'")
+                            send_reply(subject, f"Avaset has queued your Priority Prompt.")
 
-                        # Write to OpenClaw Input Buffer
                         with open(INBOX_PROMPT_FILE, "w") as f:
                             f.write(clean_body)
-                        
-                        print(f"[Avaset] Prompt Received: {datetime.now()}")
+                        print(f"[Avaset] Prompt Received and written to {INBOX_PROMPT_FILE}")
 
         mail.close()
         mail.logout()
@@ -125,5 +118,4 @@ def process_inbox():
 
 if __name__ == "__main__":
     process_inbox()
-
 
