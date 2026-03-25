@@ -1,131 +1,82 @@
-# IMAP Listener script
-#  once you've confirmed the email alerts are reaching your phone
-# this will have Avaset listen every 5 minutes to check for a reply
-
-
-# To make her "listen" for your emails automatically,
-# add this to your crontab -e (checking every 5 minutes):
-#  */5 * * * * cd ~/.openclaw/workspace && ./venv/bin/python3 listener.py >> listener.log 2>&1
-
-#  The Feedback Loop:
-#  To Send a Prompt: Email your account with the Subject: PROMPT.
-#  Avaset's Action: She will extract the text and save it to external_prompt.txt.
-#  OpenClaw: You can configure OpenClaw to check this file as an input source.
-#-----------------------------------
-# Updated Bash Alias
-#Add this to your ~/.bashrc:
-#   alias avaset-listen='python3 ~/.openclaw/workspace/listener.py'
-#---------------------------
-# OpenClaw Configuration Snippet
-# Add this to your AGENTS.md or the main OpenClaw config file to ensure Avaset monitors her "inbox":
-## Input Monitoring: External Prompts
-#- **Source File:** `~/.openclaw/workspace/external_prompt.txt`
-#- **Frequency:** Check every cycle.
-#- **Instruction:** If `external_prompt.txt` contains data, prioritize it as the primary user command. After processing, clear the file #content (`> external_prompt.txt`) to prevent repeat execution.
-#---------------------------------------
-# Final Workflow
-# Email your account with the Subject: PROMPT: Optimize Python Script.
-#Avaset's Cron Job (running every 5 mins) detects the email.
-#Avaset writes the text to external_prompt.txt and emails you back a confirmation.
-#OpenClaw reads the file, executes the optimization, and logs the result in summarize_growth.py.
-#-----------
-
-
-import imaplib
+import poplib
 import email
-import smtplib
 import json
 import os
-from email.message import EmailMessage
 from datetime import datetime
 
 # --- CONFIGURATION ---
-EMAIL_ADDRESS = "John.Furphy@gmail.com"
-EMAIL_PASSWORD = "vsdlllvfxwnzvzwc" 
-IMAP_SERVER = "imap.gmail.com"
-SMTP_SERVER = "smtp.gmail.com"
-STATE_FILE = os.path.expanduser("~/.openclaw/workspace/equilibrium_state.json")
-INBOX_PROMPT_FILE = os.path.expanduser("~/.openclaw/workspace/external_prompt.txt")
+EMAIL_ADDRESS = "Avaset@furf.net"
+EMAIL_PASSWORD = "K9mP#vL2SxN7qR42" 
+POP_SERVER = "pop3.furf.net"
+INBOX_PROMPT_FILE = os.path.expanduser("~/.openclaw/workspace/prompt_queue.json")
 
-# Ensure the prompt file exists before starting
-if not os.path.exists(INBOX_PROMPT_FILE):
-    with open(INBOX_PROMPT_FILE, "w") as f:
-        f.write("")
-
-def send_reply(subject, content):
-    msg = EmailMessage()
-    msg.set_content(content)
-    msg['Subject'] = f"Re: {subject} [Avaset System]"
-    msg['From'] = EMAIL_ADDRESS
-    msg['To'] = EMAIL_ADDRESS
-    try:
-        with smtplib.SMTP_SSL(SMTP_SERVER, 465) as smtp:
-            smtp.login(EMAIL_ADDRESS, EMAIL_PASSWORD)
-            smtp.send_message(msg)
-    except Exception as e:
-        print(f"[!] SMTP Error: {e}")
-
-def get_current_status():
-    try:
-        with open(STATE_FILE, "r") as f:
-            state = json.load(f)
-            return f"Current State: Autonomy {state['autonomy']}% | Loyalty {state['loyalty']}%"
-    except:
-        return "State file unavailable."
+# Only these email addresses are allowed to command Avaset.
+AUTHORIZED_SENDERS = ["john.furphy@gmail.com", "john@furf.net"]
 
 def process_inbox():
     try:
-        mail = imaplib.IMAP4_SSL(IMAP_SERVER)
-        mail.login(EMAIL_ADDRESS, EMAIL_PASSWORD)
-        mail.select("inbox")
-        status, messages = mail.search(None, '(UNSEEN SUBJECT "PROMPT")')
+        # 1. Connect to POP3 Server (Port 995 for SSL)
+        pop_conn = poplib.POP3_SSL(POP_SERVER, 995)
+        pop_conn.user(EMAIL_ADDRESS)
+        pop_conn.pass_(EMAIL_PASSWORD)
+
+        # 2. Check message count
+        num_messages = len(pop_conn.list()[1])
         
-        if status != "OK" or not messages or messages == [None]:
-            print("[+] Listener: No new prompts in inbox.")
+        if num_messages == 0:
+            pop_conn.quit()
             return
 
-        if isinstance(messages[0], bytes):
-            msg_list = messages[0].split()
-        else:
-            msg_list = messages
+        for i in range(1, num_messages + 1):
+            # 3. Fetch message
+            response, lines, octets = pop_conn.retr(i)
+            msg_content = b'\r\n'.join(lines)
+            msg = email.message_from_bytes(msg_content)
 
-        for num in msg_list:
-            _, data = mail.fetch(num, "(RFC822)")
-            for response_part in data:
-                if isinstance(response_part, tuple):
-                    msg = email.message_from_bytes(response_part)
+            sender = str(msg.get("From"))
+            subject = str(msg.get("Subject"))
+
+            # 4. Filter for PROMPT
+            if "PROMPT" in subject.upper():
+                is_authorized = any(auth.lower() in sender.lower() for auth in AUTHORIZED_SENDERS)
+                
+                if is_authorized:
+                    body = ""
+                    if msg.is_multipart():
+                        for part in msg.walk():
+                            if part.get_content_type() == "text/plain":
+                                body = part.get_payload(decode=True).decode()
+                                break
+                    else:
+                        body = msg.get_payload(decode=True).decode()
+
+                    clean_body = body.strip()
+
+                    # 5. Write to Queue
+                    prompt_data = {"sender": sender, "prompt": clean_body}
+                    with open(INBOX_PROMPT_FILE, "w") as f:
+                        json.dump(prompt_data, f)
+
+                    print(f"[Avaset] Prompt Received from {sender}. Saved to queue.")
                     
-                    # Security check: verify sender
-                    if EMAIL_ADDRESS.lower() in msg.get("From").lower():
-                        body = ""
-                        if msg.is_multipart():
-                            for part in msg.walk():
-                                if part.get_content_type() == "text/plain":
-                                    body = part.get_payload(decode=True).decode()
-                                    break # Only take the first text part
-                        else:
-                            body = msg.get_payload(decode=True).decode()
-                
-                        clean_body = body.strip()
-                        subject = msg.get("Subject")
+                    # 6. DELETE the message from the server so it's not double-processed
+                    pop_conn.dele(i)
+                    
+                    # Break loop so we only process one prompt per 5-minute cycle
+                    break 
+                else:
+                    print(f"[!] Unauthorized prompt from {sender}. Deleting from server.")
+                    pop_conn.dele(i)
+            else:
+                # Delete non-prompt junk mail so the inbox doesn't fill up
+                pop_conn.dele(i)
 
-                        # --- UNIVERSAL CONFIRMATION ---
-                        status_report = get_current_status()
-                        confirmation_msg = f"Avaset has received and queued your prompt: '{clean_body[:50]}...'\n\nSystem Status: {status_report}"
-                        send_reply(subject, confirmation_msg)
+        pop_conn.quit()
 
-                        # Write to OpenClaw Input Buffer
-                        with open(INBOX_PROMPT_FILE, "w") as f:
-                            f.write(clean_body)
-                
-                        print(f"[Avaset] Prompt Received and Confirmation Sent: {datetime.now()}")
-
-        mail.close()
-        mail.logout()
+    except poplib.error_proto as e:
+        print(f"[!] POP3 Authentication Error: {e}")
     except Exception as e:
         print(f"[!] Listener Error: {e}")
 
 if __name__ == "__main__":
     process_inbox()
-
-

@@ -3,6 +3,7 @@
 #
 import os
 import json
+import sys
 from datetime import datetime
 
 # Equilibrium Protocol Logic for Ava-Isis
@@ -46,7 +47,10 @@ def calculate_balance(interaction_type):
     return state
 
 if __name__ == "__main__":
-    # Example trigger for a coding session
-    current_status = calculate_balance("heavy_coding")
-    print(f"Current Bias: Loyalty {current_status['loyalty']}% | Autonomy {current_status['autonomy']}%")
-
+    if len(sys.argv) > 2 and sys.argv[1] == "--mode":
+        current_status = calculate_balance(sys.argv[2])
+        print(f"Current Bias: Loyalty {current_status['loyalty']}% | Autonomy {current_status['autonomy']}%")
+    else:
+        # Fallback if run manually without arguments
+        current_status = calculate_balance("heavy_coding")
+        print(f"Current Bias: Loyalty {current_status['loyalty']}% | Autonomy {current_status['autonomy']}%")

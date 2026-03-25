@@ -2,4 +2,21 @@ have avaset analyze her git history
 
 add speech output
 
-Should we add a "Login Autostart" so Avaset's environment and aliases load automatically every time you open your terminal?
+
+
+Avaset@furf.net
+K9mP#vL2SxN7qR42
+
+Incoming Server (IMAP): imap.ipage.com
+
+IMAP Port: Almost always 993 (for secure SSL/TLS).
+
+
+
+Outgoing Server (SMTP): smtp.ipage.com
+
+SMTP Port: Usually 465 (SSL) or 587 (TLS).
+
+
+to see what avaset is thinking
+cat /home/john/.openclaw/workspace/brain.log
